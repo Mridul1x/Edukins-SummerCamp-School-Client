@@ -7,7 +7,7 @@ require("dotenv").config();
 app.use(cors());
 app.use(express.json());
 
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@cluster0.bi1yihr.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -29,6 +29,9 @@ async function run() {
     const instructorCollection = client
       .db("summercamp")
       .collection("instructor");
+    const selectedItemsCollection = client
+      .db("summercamp")
+      .collection("selectedItems");
 
     app.get("/users", async (req, res) => {
       const result = await usersCollection.find().toArray();
@@ -52,12 +55,40 @@ async function run() {
       const result = await classesCollection.find().toArray();
       res.send(result);
     });
-    
+
     app.get("/instructor", async (req, res) => {
       const result = await instructorCollection.find().toArray();
       res.send(result);
     });
+    // TODO: veryfyjt >
+    app.get("/selectedItems", async (req, res) => {
+      const email = req.query.email;
 
+      if (!email) {
+        res.send([]);
+      }
+
+      // const decodedEmail = req.decoded.email;
+      // if (email !== decodedEmail) {
+      //   return res.status(403).send({ error: true, message: 'forbidden access' })
+      // }
+
+      const query = { email: email };
+      const result = await selectedItemsCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    app.post("/selectedItems", async (req, res) => {
+      const item = req.body;
+      const result = await selectedItemsCollection.insertOne(item);
+      res.send(result);
+    });
+    app.delete("/selectedItems/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await selectedItemsCollection.deleteOne(query);
+      res.send(result);
+    });
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
