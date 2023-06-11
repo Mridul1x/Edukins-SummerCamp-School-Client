@@ -27,6 +27,9 @@ async function run() {
 
     const usersCollection = client.db("summercamp").collection("users");
     const classesCollection = client.db("summercamp").collection("classes");
+    const instructorClassesCollection = client
+      .db("summercamp")
+      .collection("instructorClasses");
     const instructorCollection = client
       .db("summercamp")
       .collection("instructor");
@@ -102,8 +105,15 @@ async function run() {
       res.send(result);
     });
 
+    //classes
     app.get("/classes", async (req, res) => {
       const result = await classesCollection.find().toArray();
+      res.send(result);
+    });
+
+    app.post("/classes", async (req, res) => {
+      const newItem = req.body;
+      const result = await classesCollection.insertOne(newItem);
       res.send(result);
     });
 
