@@ -247,6 +247,29 @@ async function run() {
       });
     });
     // payment
+    app.get("/payments", async (req, res) => {
+      const email = req.query.email;
+      if (!email) {
+        res.send([]);
+      }
+      const query = { email: email };
+      const result = await paymentCollection.find(query).toArray();
+      res.send(result);
+    });
+    // app.get("/payments", async (req, res) => {
+    //   const email = req.query.email;
+    //   if (!email) {
+    //     res.send([]);
+    //   }
+    //   // const decodedEmail = req.decoded.email;
+    //   // if (email !== decodedEmail) {
+    //   //   return res.status(403).send({ error: true, message: 'forbidden access' })
+    //   // }
+
+    //   const query = { email: email };
+    //   const result = await paymentCollection.find(query).toArray();
+    //   res.send(result);
+    // });
     // TODO verifyJWT >
     app.post("/payments", async (req, res) => {
       const payment = req.body;
@@ -259,11 +282,12 @@ async function run() {
 
       res.send({ insertResult, deleteResult });
     });
+
     app.post("/update-available-seats", async (req, res) => {
       const { classIds } = req.body;
       const updateResult = await classesCollection.updateMany(
         { _id: { $in: classIds.map((id) => new ObjectId(id)) } },
-        { $inc: { availableSeats: -1 } }
+        { $inc: { availableSeats: -1, totalEnrolledStudents: +1 } }
       );
 
       res.send(updateResult);
