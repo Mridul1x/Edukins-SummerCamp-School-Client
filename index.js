@@ -48,9 +48,6 @@ async function run() {
 
     const usersCollection = client.db("summercamp").collection("users");
     const classesCollection = client.db("summercamp").collection("classes");
-    const instructorClassesCollection = client
-      .db("summercamp")
-      .collection("instructorClasses");
     const instructorCollection = client
       .db("summercamp")
       .collection("instructor");
@@ -59,10 +56,11 @@ async function run() {
       .collection("selectedItems");
     const paymentCollection = client.db("summercamp").collection("payments");
     //jwt
+
     app.post("/jwt", (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: "3h",
+        expiresIn: "2h",
       });
 
       res.send({ token });
@@ -73,9 +71,7 @@ async function run() {
       const query = { email: email };
       const user = await usersCollection.findOne(query);
       if (user?.role !== "Admin") {
-        return res
-          .status(403)
-          .send({ error: true, message: "forbidden message" });
+        return res.status(403).send({ error: true, message: "Forbidden" });
       }
       next();
     };
@@ -100,7 +96,7 @@ async function run() {
 
     //user make admin api jwt
 
-    app.get("/users/admin/:email", async (req, res) => {
+    app.get("/users/admin/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
 
       const query = { email: email };
@@ -124,12 +120,12 @@ async function run() {
 
     //user make instructor api jwt
 
-    app.get("/users/instructor/:email", async (req, res) => {
+    app.get("/users/instructor/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
 
       const query = { email: email };
       const user = await usersCollection.findOne(query);
-      const result = { admin: user?.role === "Instructor" };
+      const result = { instructor: user?.role === "Instructor" };
       res.send(result);
     });
 
@@ -142,7 +138,6 @@ async function run() {
           role: "Instructor",
         },
       };
-
       const result = await usersCollection.updateOne(filter, updateDoc);
       res.send(result);
     });
@@ -151,18 +146,24 @@ async function run() {
     app.get("/classes", async (req, res) => {
       const search = req.query.search || "";
       const userEmail = req.query.email || "";
+      const status = "approved";
+      const sort = req.query.sort || "totalEnrolledStudents";
       // const query = { email: email };
       const query = {
         name: { $regex: search, $options: "i" },
+        status: status,
       };
       if (userEmail) {
         query.email = userEmail;
       }
-      const result = await classesCollection.find(query).toArray();
+      const result = await classesCollection
+        .find(query)
+        .sort({ [sort]: -1 })
+        .toArray();
       res.send(result);
     });
 
-    app.post("/classes", async (req, res) => {
+    app.post("/classes", verifyJWT, async (req, res) => {
       const newItem = req.body;
       const result = await classesCollection.insertOne(newItem);
       res.send(result);
@@ -205,16 +206,17 @@ async function run() {
       res.send(result);
     });
     // TODO: veryfyjt >
-    app.get("/selectedItems", async (req, res) => {
+    app.get("/selectedItems", verifyJWT, async (req, res) => {
       const email = req.query.email;
       if (!email) {
         res.send([]);
       }
-      // const decodedEmail = req.decoded.email;
-      // if (email !== decodedEmail) {
-      //   return res.status(403).send({ error: true, message: 'forbidden access' })
-      // }
-
+      const decodedEmail = req.decoded.email;
+      if (email !== decodedEmail) {
+        return res
+          .status(403)
+          .send({ error: true, message: "forbidden access" });
+      }
       const query = { email: email };
       const result = await selectedItemsCollection.find(query).toArray();
       res.send(result);
@@ -233,7 +235,7 @@ async function run() {
     });
     // payment
     // TODO verifyJWT >
-    app.post("/create-payment-intent", async (req, res) => {
+    app.post("/create-payment-intent", verifyJWT, async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price * 100);
       const paymentIntent = await stripe.paymentIntents.create({
@@ -247,7 +249,7 @@ async function run() {
       });
     });
     // payment
-    app.get("/payments", async (req, res) => {
+    app.get("/payments", verifyJWT, async (req, res) => {
       const email = req.query.email;
       if (!email) {
         res.send([]);
@@ -256,22 +258,8 @@ async function run() {
       const result = await paymentCollection.find(query).toArray();
       res.send(result);
     });
-    // app.get("/payments", async (req, res) => {
-    //   const email = req.query.email;
-    //   if (!email) {
-    //     res.send([]);
-    //   }
-    //   // const decodedEmail = req.decoded.email;
-    //   // if (email !== decodedEmail) {
-    //   //   return res.status(403).send({ error: true, message: 'forbidden access' })
-    //   // }
 
-    //   const query = { email: email };
-    //   const result = await paymentCollection.find(query).toArray();
-    //   res.send(result);
-    // });
-    // TODO verifyJWT >
-    app.post("/payments", async (req, res) => {
+    app.post("/payments", verifyJWT, async (req, res) => {
       const payment = req.body;
       const insertResult = await paymentCollection.insertOne(payment);
 
@@ -289,7 +277,6 @@ async function run() {
         { _id: { $in: classIds.map((id) => new ObjectId(id)) } },
         { $inc: { availableSeats: -1, totalEnrolledStudents: +1 } }
       );
-
       res.send(updateResult);
     });
     // Send a ping to confirm a successful connection
